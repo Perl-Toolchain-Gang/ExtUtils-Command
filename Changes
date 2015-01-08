@@ -1,3 +1,9 @@
+1.20  Thu, Jan 8, 2015
+  - Skip some tests on Haiku as well
+
+1.19  Sat, Dec 27, 2014
+  - Late load required modules
+
 1.18  Mon, Sep 9, 2013
   - Remove obsolete VOS special cases from eu_command.t.
 
