@@ -1,3 +1,6 @@
+  - Add symbolic names to chmod
+    Now, ugo=rw or u+x work
+
 1.20  Thu, Jan 8, 2015
   - Skip some tests on Haiku as well
 
