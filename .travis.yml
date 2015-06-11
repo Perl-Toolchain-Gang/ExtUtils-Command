@@ -1,5 +1,5 @@
 language: perl
-script: prove -lr t
+script: prove -lrv t
 install: []
 perl:
   - "5.20"
