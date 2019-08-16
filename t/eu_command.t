@@ -261,6 +261,9 @@ BEGIN {
         is( ((stat('testdir'))[2] & 07777) & 0700,
             0200, 'change a dir to write-only' );
 
+        # Clean up that directory
+        @ARGV = ( 'u=wx', 'testdir' );
+        ExtUtils::Command::chmod();
         @ARGV = ('testdir');
         rm_rf;
         ok( ! -e 'testdir', 'rm_rf can delete a write-only dir' );
