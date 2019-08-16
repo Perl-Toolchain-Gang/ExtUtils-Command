@@ -245,6 +245,15 @@ BEGIN {
         is( ((stat('testdir'))[2] & 07777) & 0700,
             0400, 'change a dir to read-only' );
 
+        @ARGV = ('testdir');
+        rm_rf;
+        ok( ! -e 'testdir', 'rm_rf can delete a read-only dir' );
+
+        if( ! -e 'testdir' ) {
+            @ARGV = ('testdir');
+            mkpath;
+        };
+
         # change a dir to write-only
         @ARGV = ( 'u=w', 'testdir' );
         ExtUtils::Command::chmod();
@@ -254,7 +263,7 @@ BEGIN {
 
         @ARGV = ('testdir');
         rm_rf;
-        ok( ! -e 'testdir', 'rm_rf can delete a read-only dir' );
+        ok( ! -e 'testdir', 'rm_rf can delete a write-only dir' );
     }
 
 
