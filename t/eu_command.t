@@ -16,7 +16,7 @@ BEGIN {
     File::Path::rmtree( 'ecmddir' );
 }
 
-use Test::More tests => 40;
+use Test::More tests => 54;
 use File::Spec;
 
 BEGIN {
@@ -97,11 +97,18 @@ BEGIN {
             $^O eq 'NetWare' || $^O eq 'dos' || $^O eq 'cygwin'  ||
             $^O eq 'MacOS'
            ) {
-            skip( "different file permission semantics on $^O", 3);
+            skip( "different file permission semantics on $^O", 6);
         }
 
         # change a file to execute-only
         @ARGV = ( '0100', $Testfile );
+        ExtUtils::Command::chmod();
+
+        is( ((stat($Testfile))[2] & 07777) & 0700,
+            0100, 'change a file to execute-only' );
+
+        # change a file to execute-only
+        @ARGV = ( 'u=x', $Testfile );
         ExtUtils::Command::chmod();
 
         is( ((stat($Testfile))[2] & 07777) & 0700,
@@ -114,13 +121,68 @@ BEGIN {
         is( ((stat($Testfile))[2] & 07777) & 0700,
             0400, 'change a file to read-only' );
 
+        # change a file to read-only
+        @ARGV = ( 'u=r', $Testfile );
+        ExtUtils::Command::chmod();
+
+        is( ((stat($Testfile))[2] & 07777) & 0700,
+            0400, 'change a file to read-only' );
+
         # change a file to write-only
         @ARGV = ( '0200', $Testfile );
         ExtUtils::Command::chmod();
 
         is( ((stat($Testfile))[2] & 07777) & 0700,
             0200, 'change a file to write-only' );
+
+        # change a file to write-only
+        @ARGV = ( 'u=w', $Testfile );
+        ExtUtils::Command::chmod();
+
+        is( ((stat($Testfile))[2] & 07777) & 0700,
+            0200, 'change a file to write-only' );
+
     }
+
+    # Check that that we can chmod ugo+rx
+    # a file and keep the user permissions
+    # without touching the OS
+    @ARGV = ( 'u=rwx', $Testfile );
+    my($keep,$add)= ExtUtils::Command::_parse_chmod_masks('go+rx');
+    is( $keep, 07777, "Keep all flags (rwx)" )
+        or diag sprintf "Got %05o", $keep;
+    is( $add,  00055, "Add g/o flags (r-x)" )
+        or diag sprintf "Got %05o", $add;
+
+    ($keep,$add)= ExtUtils::Command::_parse_chmod_masks('go-rx');
+    is( $keep, 07722, "Keep some flags (rwx)" )
+        or diag sprintf "Got %05o", $keep;
+    is( $add,  00000, "Add no flags ()" )
+        or diag sprintf "Got %05o", $add;
+
+    SKIP: {
+        if ($^O eq 'amigaos' || $^O eq 'os2' || $^O eq 'MSWin32' ||
+            $^O eq 'NetWare' || $^O eq 'dos' || $^O eq 'cygwin'  ||
+            $^O eq 'MacOS'
+           ) {
+            skip( "different file permission semantics on $^O", 2);
+        }
+
+        # Now check that we can also touch the OS
+        chmod 0 => $Testfile; # reset
+
+        # change a file to write-only
+        @ARGV = ( 'u=rwx', $Testfile );
+        ExtUtils::Command::chmod();
+
+        # change a file to write-only
+        @ARGV = ( 'ugo+rx', $Testfile );
+        ExtUtils::Command::chmod();
+
+        is( ((stat($Testfile))[2] & 07777) & 0777,
+            0755, 'change a file to u=rwx, go=r-x' )
+            or diag sprintf "Got permissions %04o, expected 0755", ((stat($Testfile))[2] & 07777);
+    };
 
     # change a file to read-write
     @ARGV = ( '0600', $Testfile );
@@ -131,13 +193,31 @@ BEGIN {
     is( ((stat($Testfile))[2] & 07777) & 0700,
         0600, 'change a file to read-write' );
 
+    # change a file to read-write
+    @ARGV = ( 'u=rw', $Testfile );
+    @orig_argv = @ARGV;
+    ExtUtils::Command::chmod();
+    is_deeply( \@ARGV, \@orig_argv, 'chmod preserves @ARGV' );
+
+    is( ((stat($Testfile))[2] & 07777) & 0700,
+        0600, 'change a file to read-write (u=rw)' );
+
+    # add read-permissions for group and other
+    @ARGV = ( 'a=r', $Testfile );
+    @orig_argv = @ARGV;
+    ExtUtils::Command::chmod();
+    is_deeply( \@ARGV, \@orig_argv, 'chmod preserves @ARGV' );
+
+    is( ((stat($Testfile))[2] & 07777) & 0777,
+        0444, 'add read-permission for all users (a=r)' )
+        or diag sprintf "got permissions %04o", ((stat($Testfile))[2] & 07777);
 
     SKIP: {
         if ($^O eq 'amigaos' || $^O eq 'os2' || $^O eq 'MSWin32' ||
             $^O eq 'NetWare' || $^O eq 'dos' || $^O eq 'cygwin'  ||
             $^O eq 'MacOS'   || $^O eq 'haiku'
            ) {
-            skip( "different file permission semantics on $^O", 5);
+            skip( "different file permission semantics on $^O", 7);
         }
 
         @ARGV = ('testdir');
@@ -151,23 +231,42 @@ BEGIN {
         is( ((stat('testdir'))[2] & 07777) & 0700,
             0100, 'change a dir to execute-only' );
 
+        # change a dir to execute-only
+        @ARGV = ( 'u=x', 'testdir' );
+        ExtUtils::Command::chmod();
+
+        is( ((stat('testdir'))[2] & 07777) & 0700,
+            0100, 'change a dir to execute-only' );
+
         # change a dir to read-only
-        @ARGV = ( '0400', 'testdir' );
+        @ARGV = ( 'u=r', 'testdir' );
         ExtUtils::Command::chmod();
 
         is( ((stat('testdir'))[2] & 07777) & 0700,
             0400, 'change a dir to read-only' );
 
+        @ARGV = ('testdir');
+        rm_rf;
+        ok( ! -e 'testdir', 'rm_rf can delete a read-only dir' );
+
+        if( ! -e 'testdir' ) {
+            @ARGV = ('testdir');
+            mkpath;
+        };
+
         # change a dir to write-only
-        @ARGV = ( '0200', 'testdir' );
+        @ARGV = ( 'u=w', 'testdir' );
         ExtUtils::Command::chmod();
 
         is( ((stat('testdir'))[2] & 07777) & 0700,
             0200, 'change a dir to write-only' );
 
+        # Clean up that directory
+        @ARGV = ( 'u=wx', 'testdir' );
+        ExtUtils::Command::chmod();
         @ARGV = ('testdir');
         rm_rf;
-        ok( ! -e 'testdir', 'rm_rf can delete a read-only dir' );
+        ok( ! -e 'testdir', 'rm_rf can delete a write-only dir' );
     }
 
 

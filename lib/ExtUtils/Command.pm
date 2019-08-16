@@ -256,9 +256,63 @@ Sets UNIX like permissions 'mode' on all the files.  e.g. 0666
 
 =cut
 
+sub _parse_chmod_masks {
+    my( $mode_change )= @_;
+    my( $keep, $add ); # we reset all bits
+
+    # If we have symbolic names, change these into
+    # operator and masks
+    if( $mode_change =~ /\D/ ) {
+        # the chmod manpage says that the symbolic string
+        # must match
+        # /^[ugoa]*[[+-=]*[rwxXstugo]$/
+        # We don't support Xstugo, as it keeps the logic simpler
+        if( $mode_change !~ /^([ugoa]*)([+-=])([rwx]+)/ ) {
+            die "Invalid mode change '$mode_change'";
+        };
+
+        my( $user, $op, $symbolic_mode )= ($1,$2,$3);
+        $user ||= 'ugo';
+        $user =~ s/a/ugo/;
+
+        my %bits= ( r => 4, w => 2, x => 1 );
+        my $perm= 0;
+        $perm |= $_
+            for @bits{ split //, $symbolic_mode };
+
+        my $mode= 0;
+        my %shift= ( u => 6, g => 3, o => 0 );
+        for my $category (split //, $user) {
+            $mode= $mode | ($perm << $shift{ $category });
+        };
+
+        if( '=' eq $op ) {
+            $keep= 0;
+            $add= $mode;
+        } elsif( '-' eq $op ) {
+            $keep= 07777 & ~$mode;
+            $add= 0;
+        } elsif( '+' eq $op ) {
+            $keep= 07777;
+            $add= $mode;
+        } else {
+            die "This should not happen: Unknown mode '$op'";
+        };
+    } else {
+        if( $mode_change =~ /^0[0-7]+$/ ) {
+            # Octal number passed as string
+            $mode_change= oct $mode_change;
+        };
+        $keep= 0;
+        $add= $mode_change;
+    };
+
+    ($keep,$add)
+}
+
 sub chmod {
     local @ARGV = @ARGV;
-    my $mode = shift(@ARGV);
+    my $mode_change = shift(@ARGV);
     expand_wildcards();
 
     if( $Is_VMS_mode && $Is_VMS_noefs) {
@@ -277,7 +331,21 @@ sub chmod {
         }
     }
 
-    chmod(oct $mode,@ARGV) || die "Cannot chmod ".join(' ',$mode,@ARGV).":$!";
+    # Set up defaults
+    my( $keep, $add )= _parse_chmod_masks( $mode_change );
+
+    my $changed;
+    for my $fn (@ARGV) {
+        my $mode= (stat $fn)[2] & 07777;
+        my $new_mode= ($mode & $keep) | $add;
+        if( $new_mode != $mode ) {
+            $changed += chmod $new_mode, $fn;
+        } else {
+            $changed++
+        };
+    };
+    $changed == @ARGV
+        || die "Cannot chmod ".join(' ',$mode_change,@ARGV).":$!";
 }
 
 =item mkpath
