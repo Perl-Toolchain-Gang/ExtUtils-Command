@@ -16,7 +16,7 @@ BEGIN {
     File::Path::rmtree( 'ecmddir' );
 }
 
-use Test::More tests => 58;
+use Test::More tests => 54;
 use File::Spec;
 
 BEGIN {
@@ -170,7 +170,7 @@ BEGIN {
 
         # Now check that we can also touch the OS
         chmod 0 => $Testfile; # reset
-        
+
         # change a file to write-only
         @ARGV = ( 'u=rwx', $Testfile );
         ExtUtils::Command::chmod();
@@ -217,7 +217,7 @@ BEGIN {
             $^O eq 'NetWare' || $^O eq 'dos' || $^O eq 'cygwin'  ||
             $^O eq 'MacOS'   || $^O eq 'haiku'
            ) {
-            skip( "different file permission semantics on $^O", 10);
+            skip( "different file permission semantics on $^O", 7);
         }
 
         @ARGV = ('testdir');
